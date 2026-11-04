@@ -2,7 +2,7 @@ name: zelda-watch
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # repo privado: 2000 min/mes gratis. GitHub puede retrasarlo
+    - cron: "*/5 * * * *"    # repo público: minutos ilimitados. GitHub puede retrasarlo
     - cron: "0 15 * * 1"     # heartbeat: lunes 12:00 Chile, "sigo vivo" a Discord
   workflow_dispatch:
     inputs:
@@ -48,8 +48,10 @@ jobs:
           git config user.name "zelda-bot"
           git config user.email "actions@users.noreply.github.com"
           git add seen.json 2>/dev/null || true
-          git diff --cached --quiet && exit 0
-          git commit -m "seen: update"
+          if ! git diff --cached --quiet; then git commit -m "seen: update"
+          # repo público: GitHub apaga el cron tras 60 días sin commits; commit semanal lo mantiene vivo
+          elif [ "${{ github.event.schedule }}" = "0 15 * * 1" ]; then git commit --allow-empty -m "keepalive"
+          else exit 0; fi
           for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
           exit 1
       - name: Avisar falla a Discord
