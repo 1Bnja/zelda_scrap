@@ -2,7 +2,8 @@ name: zelda-watch
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # GitHub puede retrasarlo varios minutos
+    - cron: "*/30 * * * *"   # repo privado: 2000 min/mes gratis. GitHub puede retrasarlo
+    - cron: "0 15 * * 1"     # heartbeat: lunes 12:00 Chile, "sigo vivo" a Discord
   workflow_dispatch:
     inputs:
       test:
@@ -15,7 +16,8 @@ on:
         default: ""
 
 permissions:
-  contents: write   # para guardar seen.json
+  contents: write   # guardar seen.json
+  actions: read     # ver si la corrida anterior falló (anti-spam de alertas)
 
 concurrency:
   group: zelda-watch
@@ -32,16 +34,32 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: python watch.py --selfcheck && python watch.py
+      - run: python watch.py --selfcheck && python test_watch.py
+      - run: python watch.py
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           MELI_CLIENT_ID: ${{ secrets.MELI_CLIENT_ID }}
           MELI_CLIENT_SECRET: ${{ secrets.MELI_CLIENT_SECRET }}
           TEST: ${{ inputs.test && '1' || '0' }}
-          PRODUCT_ID: ${{ inputs.product_id || 'MLC79199012' }}
+          PRODUCT_ID: ${{ inputs.product_id }}
+          HEARTBEAT: ${{ github.event.schedule == '0 15 * * 1' && '1' || '0' }}
       - name: Guardar seen.json
         run: |
           git config user.name "zelda-bot"
           git config user.email "actions@users.noreply.github.com"
           git add seen.json 2>/dev/null || true
-          git diff --cached --quiet || (git commit -m "seen: update" && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "seen: update"
+          for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
+          exit 1
+      - name: Avisar falla a Discord
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          prev=$(gh run list --workflow watch.yml --status completed -L 1 --json conclusion -q '.[0].conclusion')
+          if [ "$prev" = "failure" ]; then echo "la anterior ya falló y avisó, no repetir"; exit 0; fi
+          curl -sf -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK" \
+            -d "{\"content\":\"⚠️ zelda_scrap falló, no está vigilando. Log: $RUN_URL\",\"allowed_mentions\":{\"parse\":[]}}"
