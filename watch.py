@@ -38,6 +38,7 @@ def notify(text):
 def catalog_items(s):
     """Publicaciones activas del producto de catálogo (vacío = no disponible)."""
     r = s.get(f"{API}/products/{PRODUCT_ID}/items", timeout=20)
+    print(f"catalog {PRODUCT_ID}: HTTP {r.status_code}")
     if r.status_code == 404:  # sin vendedores todavía
         return []
     r.raise_for_status()

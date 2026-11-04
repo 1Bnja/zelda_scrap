@@ -9,6 +9,10 @@ on:
         description: "Mandar mensaje de prueba a Discord"
         type: boolean
         default: false
+      product_id:
+        description: "ID de catálogo /p/MLC... a vigilar (vacío = Zelda)"
+        type: string
+        default: ""
 
 permissions:
   contents: write   # para guardar seen.json
@@ -34,6 +38,7 @@ jobs:
           MELI_CLIENT_ID: ${{ secrets.MELI_CLIENT_ID }}
           MELI_CLIENT_SECRET: ${{ secrets.MELI_CLIENT_SECRET }}
           TEST: ${{ inputs.test && '1' || '0' }}
+          PRODUCT_ID: ${{ inputs.product_id || 'MLC79199012' }}
       - name: Guardar seen.json
         run: |
           git config user.name "zelda-bot"
