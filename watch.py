@@ -30,8 +30,14 @@ def token():
     return r.json()["access_token"]
 
 
+PING_USER = "335205619944652808"
+
+
 def notify(text):
-    r = requests.post(os.environ["DISCORD_WEBHOOK"], json={"content": text}, timeout=20)
+    r = requests.post(os.environ["DISCORD_WEBHOOK"], timeout=20, json={
+        "content": f"<@{PING_USER}> {text}",
+        "allowed_mentions": {"users": [PING_USER]},
+    })
     r.raise_for_status()
 
 
