@@ -1,0 +1,42 @@
+name: zelda-watch
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # GitHub puede retrasarlo varios minutos
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Mandar mensaje de prueba a Discord"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # para guardar seen.json
+
+concurrency:
+  group: zelda-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python watch.py --selfcheck && python watch.py
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          MELI_CLIENT_ID: ${{ secrets.MELI_CLIENT_ID }}
+          MELI_CLIENT_SECRET: ${{ secrets.MELI_CLIENT_SECRET }}
+          TEST: ${{ inputs.test && '1' || '0' }}
+      - name: Guardar seen.json
+        run: |
+          git config user.name "zelda-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add seen.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "seen: update" && git push)
